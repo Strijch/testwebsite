@@ -73,6 +73,7 @@ nav.main a[aria-current="page"]{color:var(--canopy);box-shadow:inset 0 -2px 0 va
 .tag{display:inline-flex;align-items:center;padding:3px 8px;border-radius:var(--r-sm);font:500 12px/16px var(--mono);letter-spacing:.08em;text-transform:uppercase}
 .tag-flower,.tag-new{background:var(--leaf);color:var(--on-leaf)}
 .tag-rare{background:var(--canopy);color:var(--on-canopy)}
+.tag-low{background:var(--paper-raised);color:var(--warning);box-shadow:inset 0 0 0 1px var(--warning)}
 .tag-sale{background:var(--orchid);color:var(--on-orchid)}
 .tag-sold{background:var(--paper-raised);color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)}
 /* sections */
@@ -389,9 +390,13 @@ const CATS=[
  {slug:"terrarium",name:"Terrarium",blurb:"Small, humid-loving gems"},
  {slug:"rare-other",name:"Rare & other",blurb:"Staghorns, bulbs, oddities"},
  {slug:"supplies",name:"Supplies",blurb:"Fertiliser, books, kit"}];
-const slugOf=n=>CATS.find(c=>c.name===n).slug;
+const slugify=n=>String(n||'').replace(/\(.*?\)/g,'').replace(/&/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+const slugOf=n=>slugify(n);
 const P=RAW.map((r,i)=>({id:i,name:r[0],cat:r[1],price:r[2],was:r[3]>r[2]?r[3]:0,img:IMG+r[4],flower:!!r[5],meta:r[6],isNew:i<8||(i>=16&&i<19),sold:false}));
 P.find(p=>p.name.startsWith("Sinningia")).sold=true;
+P.forEach(p=>{p.tags=p.flower?["In flower"]:p.isNew?["New"]:[]});
+[12,19,24,31,36,42,52,56].forEach((i,k)=>{CATS[k].art=P[i]});
+let EVENTS=[];
 
 /* ---------- state (in memory) ---------- */
 const S={cart:new Map(),wish:new Set()};
@@ -412,12 +417,13 @@ function bot(name,cat){
   return out.join(" ");
 }
 const ph=`<div class="ph"><svg width="80" height="80" viewBox="0 0 96 96" aria-hidden="true"><path d="M8 88A80 80 0 0 1 88 8A80 80 0 0 1 8 88Z" fill="var(--leaf)" opacity=".5"/><path d="M8 88L88 8" stroke="var(--canopy)" stroke-width="1.5"/></svg></div>`;
-const img=(p,cls="")=>`<img src="${p.img}" alt="${esc(p.name)}" loading="lazy" ${cls} onerror="this.outerHTML=PH">`;
+const img=(p,cls="")=>!p||!p.img?ph:`<img src="${p.img}" alt="${esc(p.name)}" loading="lazy" ${cls} onerror="this.outerHTML=PH">`;
 window.PH=ph;
 const heart=`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>`;
 const bag=`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>`;
 
-function tags(p){const t=[];if(p.sold)t.push('<span class="tag tag-sold">Sold out</span>');else if(p.was)t.push('<span class="tag tag-sale">Sale</span>');if(p.flower)t.push('<span class="tag tag-flower">In flower</span>');else if(p.isNew&&t.length<2)t.push('<span class="tag tag-new">New</span>');return t.slice(0,2).join("")}
+const TAGCLS={"In flower":"tag-flower","New":"tag-new","Rare":"tag-rare","Low stock":"tag-low","Sale":"tag-sale","Sold out":"tag-sold"};
+function tags(p){const t=[];if(p.sold)t.push("Sold out");else if(p.was)t.push("Sale");(p.tags||[]).forEach(x=>{if(x&&!t.includes(x)&&x!=="Sale"&&x!=="Sold out")t.push(x)});return t.slice(0,2).map(x=>`<span class="tag ${TAGCLS[x]||"tag-new"}">${esc(x)}</span>`).join("")}
 function priceHtml(p){return p.was?`<span class="price price-sale">${R(p.price)}<span class="price-was">${R(p.was)}</span></span>`:`<span class="price">${R(p.price)}</span>`}
 function card(p){return `<article class="card">
   <a href="#/plant/${p.id}" class="card-media" aria-label="${esc(p.name)}">${img(p)}<div class="card-tags">${tags(p)}</div></a>
@@ -431,8 +437,8 @@ function card(p){return `<article class="card">
 /* ---------- pages ---------- */
 const pick=(f,n)=>P.filter(f).slice(0,n);
 function home(){
-  const hero=[P[2],P[1],P[22],P[30]];
-  const catImg={orchids:P[12],aroids:P[19],hoyas:P[24],carnivorous:P[31],"air-plants":P[36],terrarium:P[42],"rare-other":P[52],supplies:P[56]};
+  const hero=[...new Set(P.filter(p=>p.flower).concat(P))].slice(0,4);
+  const catArt=c=>c.art||P.find(p=>slugOf(p.cat)===c.slug);
   return `
   <section class="hero"><div class="wrap hero-grid">
     <div>
@@ -456,7 +462,7 @@ function home(){
 
   <section><div class="wrap">
     <div class="sec-head"><div><span class="label eyebrow">Browse the collection</span><h2 class="h2">Shop by plant family</h2></div><a class="btn btn-ghost" href="#/shop">Shop everything</a></div>
-    <div class="cats">${CATS.map((c,i)=>`<a class="cat" href="#/shop/${c.slug}">${img(catImg[c.slug])}<div class="cat-txt"><span class="label muted">${c.blurb}</span><h3 class="h3">${c.name}</h3></div></a>`).join("")}</div>
+    <div class="cats">${CATS.filter(c=>c.home!==false).map((c,i)=>`<a class="cat" href="#/shop/${c.slug}">${img(catArt(c))}<div class="cat-txt"><span class="label muted">${c.blurb}</span><h3 class="h3">${c.name}</h3></div></a>`).join("")}</div>
   </div></section>
 
   <section style="padding-top:0"><div class="wrap">
@@ -589,11 +595,15 @@ function careP(){
 }
 function showCare(f){$("#careGrid").innerHTML=CARE[f].map(c=>`<div class="care-card"><h3><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 21V11M12 11c0-4 3-6 7-6 0 4-3 6-7 6z"/></svg>${c[0]}</h3><p>${c[1]}</p></div>`).join("")}
 
+function openDays(){
+  if(!EVENTS.length)return `<div class="callout"><span class="label">Next open day</span>Dates are announced on our WhatsApp channel and in the monthly newsletter.</div>`;
+  return `<div class="callout"><span class="label">${EVENTS.length>1?"Upcoming open days &amp; shows":"Next open day"}</span>${EVENTS.map(e=>`<p style="margin:8px 0 0"><strong>${esc(e.when)}</strong> · ${esc(e.name)}${e.venue?" · "+esc(e.venue):""}${e.time?" · "+esc(e.time):""}${e.details?`<br><span class="small muted">${esc(e.details)}</span>`:""}</p>`).join("")}</div>`;
+}
 function visit(){return `<div class="wrap"><div class="page-head"><span class="label eyebrow">Visit &amp; contact</span><h1 class="h1">Open days, shows &amp; how to reach us</h1></div>
  <div class="split" style="align-items:start;padding-bottom:64px">
   <div class="prose">
    <p class="lead">The nursery isn't open to the public day-to-day. We open the glasshouses on selected weekends and bring plants to orchid society shows around Gauteng and North West.</p>
-   <div class="callout"><span class="label">Next open day</span>Dates are announced on our WhatsApp channel and in the monthly newsletter. <em>(Prototype: this block pulls from an Events list the team updates.)</em></div>
+   ${openDays()}
    <h2>Collect at a show</h2><p>Order online at least <strong>five days before</strong> the event, choose "Collect at show" at checkout, and we'll bring your plants.</p>
    <h2>Talk to the growers</h2>
    <div class="people" style="margin-top:16px">
@@ -700,7 +710,66 @@ document.addEventListener("change",e=>{if(e.target.matches("#fFlower,#fSale,#sor
 document.addEventListener("submit",e=>{const f=e.target.closest("[data-demo]");if(!f)return;e.preventDefault();
   const k=f.dataset.demo;if(k==="checkout"){S.cart.clear();renderCart();$("#app").innerHTML=`<div class="wrap empty"><p class="label eyebrow">Demo order placed</p><p class="h1">Thank you — your plants are booked for ${nextDispatch()}.</p><p class="lead">In the live site this page confirms payment and sends a WhatsApp/email update.</p><a class="btn btn-primary" href="#/">Back home</a></div>`;window.scrollTo(0,0)}
   else{toast(k==="newsletter"?"Subscribed (demo) — welcome aboard":"Message sent (demo)");f.reset()}});
-renderCart();route();
+
+/* ---------- live content from the Google Sheet ----------
+   Paste the Apps Script web-app URL below. While it is empty (or if the sheet
+   cannot be reached) the page keeps using the built-in list above. */
+const SHEET_API="https://script.google.com/a/macros/openvantage.co.za/s/AKfycbyTbnfxmnCcb1iIXYGSRbH3n9RkQ_XE5ojogO1ZyIJqN7CPQv9x8bOVf6SGqR3gle-beA/exec";
+const IMG_LOCAL="images/";
+const sv=(o,k)=>{k=Object.keys(o).find(x=>x.toLowerCase().startsWith(k.toLowerCase()));return k==null||o[k]==null?"":String(o[k]).trim()};
+const numv=v=>{const n=parseFloat(String(v).replace(/[^\d.]/g,""));return isNaN(n)?0:n};
+const photoUrl=f=>!f?"":/^https?:/i.test(f)?f:f.includes("/")?IMG+f:IMG_LOCAL+f;
+function applySheet(d){
+  const prods=[];
+  (d.products||[]).forEach(o=>{
+    const sku=sv(o,"SKU");if(!sku||/^PL-EX/i.test(sku))return;
+    const status=sv(o,"Site status"),stock=sv(o,"Stock status");
+    if((status&&status!=="Live")||stock==="Hidden")return;
+    let name=sv(o,"Card name");
+    if(!name){const cv=sv(o,"Cultivar");name=[sv(o,"Genus"),sv(o,"Species"),cv?"'"+cv+"'":"",sv(o,"Form")].filter(Boolean).join(" ")}
+    const reg=numv(sv(o,"Regular price")),sale=numv(sv(o,"Sale price"));
+    if(!name||!reg)return;
+    const onSale=sale>0&&sale<reg;
+    const tg=[sv(o,"Tag 1"),sv(o,"Tag 2")].filter(Boolean);
+    prods.push({sku,name,cat:sv(o,"Category"),price:onSale?sale:reg,was:onSale?reg:0,img:photoUrl(sv(o,"Photo 1")),
+      meta:sv(o,"Meta line")||[sv(o,"Pot size"),sv(o,"Plant size")].filter(Boolean).join(" · "),
+      tags:tg,flower:tg.includes("In flower"),isNew:tg.includes("New"),sold:stock==="Sold out",desc:sv(o,"Short description")});
+  });
+  const cats=(d.categories||[]).map(o=>({o,name:sv(o,"Category name")})).filter(x=>x.name)
+    .sort((a,b)=>(numv(sv(a.o,"Order"))||99)-(numv(sv(b.o,"Order"))||99));
+  if(prods.length){
+    prods.forEach((p,i)=>p.id=i);
+    P.splice(0,P.length,...prods);
+    // new product id numbers: wishlist and cart start empty on load, so this is safe
+  }
+  if(cats.length){
+    const old=CATS.slice();
+    CATS.splice(0,CATS.length,...cats.map(({o,name})=>{
+      const slug=slugify(name),prev=old.find(c=>c.slug===slug)||{};
+      const heroSku=sv(o,"Hero plant"),heroFile=photoUrl(sv(o,"Hero photo"));
+      const art=heroFile?{img:heroFile,name}:P.find(p=>p.sku&&p.sku===heroSku)||null;
+      return {slug,name,blurb:sv(o,"Eyebrow")||prev.blurb||"",art,home:!/^no$/i.test(sv(o,"Show on home"))};
+    }));
+  }
+  P.forEach(p=>{const c=CATS.find(c=>c.slug===slugOf(p.cat));if(c)p.cat=c.name});
+  const today=new Date();today.setHours(0,0,0,0);
+  EVENTS=(d.events||[]).map(o=>({o,t:new Date(sv(o,"Date")+"T00:00:00")}))
+    .filter(x=>!isNaN(x.t)&&x.t>=today&&/^y/i.test(sv(x.o,"Show on site"))&&!/^example/i.test(sv(x.o,"Event")))
+    .sort((a,b)=>a.t-b.t).slice(0,3)
+    .map(x=>({when:x.t.toLocaleDateString("en-ZA",{weekday:"long",day:"numeric",month:"long",year:"numeric"}),
+      name:sv(x.o,"Event"),venue:sv(x.o,"Venue"),time:sv(x.o,"Time"),details:sv(x.o,"Details")}));
+  return prods.length>0||cats.length>0||EVENTS.length>0;
+}
+async function loadSheet(){
+  if(!SHEET_API)return;
+  try{
+    const r=await fetch(SHEET_API,{cache:"no-store"});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    if(applySheet(d)){const y=window.scrollY,h=location.hash;route();if(location.hash===h)window.scrollTo(0,y)}
+  }catch(e){console.warn("Plantae: using built-in data, sheet not loaded",e)}
+}
+renderCart();route();loadSheet();
 </script>
 </body>
 </html>
