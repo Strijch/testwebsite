@@ -487,11 +487,7 @@ const pick=(f,n)=>P.filter(f).slice(0,n);
 function home(){
   const hero=[...new Set(P.filter(p=>p.flower).concat(P))].slice(0,4);
   const catArt=c=>c.art||P.find(p=>slugOf(p.cat)===c.slug);
-<<<<<<< Updated upstream
-  return `
-=======
   return `${dropStrip()}
->>>>>>> Stashed changes
   <section class="hero"><div class="wrap hero-grid">
     <div>
       <span class="label eyebrow">Specialist nursery · Brits, North West</span>
@@ -765,8 +761,6 @@ document.addEventListener("submit",e=>{const f=e.target.closest("[data-demo]");i
   const k=f.dataset.demo;if(k==="checkout"){S.cart.clear();renderCart();$("#app").innerHTML=`<div class="wrap empty"><p class="label eyebrow">Demo order placed</p><p class="h1">Thank you — your plants are booked for ${nextDispatch()}.</p><p class="lead">In the live site this page confirms payment and sends a WhatsApp/email update.</p><a class="btn btn-primary" href="#/">Back home</a></div>`;window.scrollTo(0,0)}
   else{toast(k==="newsletter"?"Subscribed (demo) — welcome aboard":"Message sent (demo)");f.reset()}});
 
-<<<<<<< Updated upstream
-=======
 
 /* ---------- drop sales: WhatsApp flash sales ----------
    Plantae posts photos on WhatsApp with a link to #/drop. The page opens at the start time,
@@ -1010,7 +1004,6 @@ document.addEventListener("click",e=>{
 document.addEventListener("change",e=>{if(e.target.id==="dropMethod"){const a=$("#dropAddr");if(a)a.hidden=e.target.value.startsWith("Collect")}});
 document.addEventListener("submit",e=>{const f=e.target.closest("#dropForm");if(!f)return;e.preventDefault();dropSubmit(f)});
 
->>>>>>> Stashed changes
 /* ---------- live content from the Google Sheet ----------
    Paste the Apps Script web-app URL below. While it is empty (or if the sheet
    cannot be reached) the page keeps using the built-in list above. */
@@ -1066,13 +1059,9 @@ async function loadSheet(){
     const r=await fetch(SHEET_API,{cache:"no-store"});
     if(!r.ok)throw new Error("HTTP "+r.status);
     const d=await r.json();
-<<<<<<< Updated upstream
-    if(applySheet(d)){const y=window.scrollY,h=location.hash;route();if(location.hash===h)window.scrollTo(0,y)}
-=======
     const dr=applyDrops(d),sh=applySheet(d);
     if(sh||dr){const y=window.scrollY,h=location.hash;if(!/^#\/drop/.test(h)||!D.mounted)route();else dropLiveRefresh();if(location.hash===h)window.scrollTo(0,y)}
     dropNavState();
->>>>>>> Stashed changes
   }catch(e){console.warn("Plantae: using built-in data, sheet not loaded",e)}
 }
 renderCart();route();loadSheet();
